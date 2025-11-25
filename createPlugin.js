@@ -1,13 +1,11 @@
 
 /**
- * Create Umbraco 14+ / 17 Plugin (Vue 3 + Vite) — Web Components Ready
- *
- * - Web Components (export default class HTMLElement) per l'entry "element"
- * - Vue è incluso nel bundle (no external)
- * - Sostituzione process.env a build-time (evita ReferenceError)
- * - alias 'vue' -> 'vue/dist/vue.esm-bundler.js'
- * - umbraco-package.json usa "element" (niente js/css)
- * - Per Property Editor UI: chiede propertyEditorSchemaAlias
+ * Create Umbraco 14+ / 17 Plugin (Vue 3 + Vite) — Production Ready Template
+ * * AGGIORNAMENTI CRITICI:
+ * - Estende UmbElementMixin (necessario per Context API)
+ * - Implementa super.connectedCallback() (necessario per Auth)
+ * - Usa Shadow DOM (isolamento stili)
+ * - App.vue pre-configurato con umbHttpClient e Context consumption
  */
 
 import fs from 'fs';
@@ -49,7 +47,7 @@ function pascalFromSlug(slug) {
     const appPluginsPathInput = (await ask('Percorso assoluto di App_Plugins (senza trailing slash): ')).trim();
 
     console.log(`
-📋 Scegli il tipo di estensione:
+   Scegli il tipo di estensione:
   1) Dashboard
   2) Property Editor
   3) Action Button (Entity Action)
@@ -169,6 +167,7 @@ export default defineConfig({
     <title>${pluginName} - ${chosen.display}</title>
   </head>
   <body>
+    <!-- Mock host per simulare il Web Component in dev mode -->
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
@@ -176,83 +175,168 @@ export default defineConfig({
 `;
     fs.writeFileSync(path.join(projectRoot, 'index.html'), indexHtml);
 
-    // ========== src/main.ts ==========
-    const mainTs = `import { createApp } from 'vue';
-import App from './App.vue';
-import './styles.css';
 
-createApp(App).mount('#app');
-`;
-    fs.writeFileSync(path.join(projectRoot, 'src', 'main.ts'), mainTs);
 
-    // ========== src/App.vue ==========
-    const appVue = `<template>
-  <div class="plugin-container">
-    <div class="plugin-header">
-      <h2>{{ title }}</h2>
-      <span class="plugin-badge">{{ type }}</span>
-    </div>
-    <div class="plugin-content">
-      <p class="status"> Vue + Web Component pronto!</p>
-      <div class="counter-demo">
-        <h3>Demo Counter:</h3>
-        <button @click="count++">Count: {{ count }}</button>
-      </div>
-    </div>
+    // ========== src/App.vue (Environment Ready) ==========
+    // Questo è il template aggiornato con la struttura corretta
+    const appVue = `<script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
+import { tryExecute } from "@umbraco-cms/backoffice/resources";
+import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
+
+// Prop fondamentale per accedere al Web Component Host
+const props = defineProps<{
+  mountElem: HTMLElement;
+}>();
+
+const host = ref<UmbLitElement>();
+const loading = ref(false);
+const token = ref<string | null>(null);
+
+onMounted(async () => {
+  // Recupero riferimento Host
+  host.value = (props.mountElem.getRootNode() as any).host as UmbLitElement;
+
+  if (!host.value) {
+    console.warn("[${pluginName}] Host not found (Are you in Localhost?)");
+    return;
+  }
+  
+  // Esempio: Recupero Auth Token
+  initAuth();
+});
+
+function initAuth() {
+  if (!host.value) return;
+  
+  // Utilizzo corretto di consumeContext con callback
+  host.value.consumeContext(UMB_AUTH_CONTEXT, (authContext) => {
+    const t = authContext?.getLatestToken();
+    if (t) {
+      token.value = t;
+      console.log("[${pluginName}] Authenticated!");
+      // Qui puoi chiamare le tue API: loadData(t);
+    }
+  });
+}
+
+async function loadDataExample() {
+  if (!host.value || !token.value) return;
+  
+  loading.value = true;
+  try {
+    const { data } = await tryExecute(
+        host.value, 
+        umbHttpClient.get({ 
+            url: "/umbraco/management/api/v1/user/current",
+            headers: { 'Authorization': \`Bearer \${token.value}\` }
+        })
+    );
+    console.log("Current User:", data);
+  } catch(e) {
+    console.error(e);
+  } finally {
+    loading.value = false;
+  }
+}
+</script>
+
+<template>
+  <div class="umb-plugin-box">
+    <h3>${pluginName} <span class="badge">{{ token ? 'Auth OK' : 'No Auth' }}</span></h3>
+    <p>Environment ready: Vue 3 + Vite + Umbraco Web Components.</p>
+    
+    <button @click="loadDataExample" :disabled="!token || loading">
+      {{ loading ? 'Loading...' : 'Test API Call' }}
+    </button>
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue';
-const title = '${pluginName}';
-const type = '${chosen.display}';
-const count = ref(0);
-</script>
-
 <style scoped>
-.plugin-container { padding: 24px; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
-.plugin-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
-.plugin-header h2 { margin: 0; color: #1b264f; font-size: 28px; }
-.plugin-badge { background: #3544b1; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-.status { font-size: 18px; color: #059669; font-weight: 500; margin: 0 0 16px 0; }
-.counter-demo { background: white; border: 2px solid #e5e7eb; padding: 20px; border-radius: 8px; }
-.counter-demo button { background: #3544b1; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 16px; cursor: pointer; }
-.counter-demo button:hover { background: #2c3a8f; }
+.umb-plugin-box {
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #e9e9eb;
+  border-radius: 4px;
+  font-family: 'Lato', sans-serif;
+}
+.badge {
+  background: #2bc37c;
+  color: white;
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+button {
+  background: #3544b1;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
 </style>
 `;
     fs.writeFileSync(path.join(projectRoot, 'src', 'App.vue'), appVue);
 
-    // ========== src/styles.css ==========
-    const stylesCss = `*{box-sizing:border-box}body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}#app{width:100%;min-height:100vh}`;
-    fs.writeFileSync(path.join(projectRoot, 'src', 'styles.css'), stylesCss);
 
-    // ========== Web Component wrapper (entry) ==========
+    // ========== Web Component Wrapper (.element.ts) ==========
+    // IL CUORE DELLA FIX: UmbElementMixin + super.connectedCallback
     const elementClassName = `${classSafe}${pascalFromSlug(chosen.fileSuffix)}Element`;
     const elementTs = `import { createApp } from 'vue';
+import { UmbElementMixin } from '@umbraco-cms/backoffice/element-api';
 import App from './App.vue';
-import './styles.css';
 
-export default class ${elementClassName} extends HTMLElement {
+// Template per Shadow DOM
+const template = document.createElement('template');
+template.innerHTML = \`
+  <style>
+    :host { display: block; }
+  </style>
+  <div id="vue-root"></div>
+\`;
+
+export default class ${elementClassName} extends UmbElementMixin(HTMLElement) {
   #app;
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot?.appendChild(template.content.cloneNode(true));
+  }
+
   connectedCallback() {
-    if (!this.#app) {
-      const root = document.createElement('div');
-      this.appendChild(root);
-      this.#app = createApp(App, {});
-      this.#app.mount(root);
+    super.connectedCallback();
+
+    const mountElem = this.shadowRoot?.querySelector('#vue-root');
+    
+    if (mountElem && !this.#app) {
+      // Passiamo 'this' (il Web Component Host) come prop a Vue
+      // così App.vue può accedere a 'this.consumeContext'
+      this.#app = createApp(App, { mountElem: this });
+      this.#app.mount(mountElem);
     }
   }
+
   disconnectedCallback() {
     if (this.#app) {
       this.#app.unmount();
       this.#app = null;
-      this.innerHTML = '';
     }
+    super.disconnectedCallback();
   }
 }
 
-if (!customElements.get('${customElementTag}')) {
-  customElements.define('${customElementTag}', ${elementClassName});
+const tagName = '${customElementTag}';
+if (!customElements.get(tagName)) {
+  customElements.define(tagName, ${elementClassName});
 }
 `;
     fs.writeFileSync(path.join(projectRoot, elementFile), elementTs);
@@ -306,7 +390,7 @@ if (!customElements.get('${customElementTag}')) {
         meta: {
           label: chosen.display,
           icon: "icon-wand",
-          entityTypes: ["document"] 
+          entityTypes: ["document"]
         }
       });
     }
@@ -352,6 +436,7 @@ if (!customElements.get('${customElementTag}')) {
         module: "ESNext",
         moduleResolution: "Node",
         allowSyntheticDefaultImports: true,
+        types: ["node"]
       },
       include: ["vite.config.ts"]
     };
@@ -374,29 +459,25 @@ Thumbs.db
 
 ${chosen.display} per Umbraco 14+/17 (Vue 3 + Vite + Web Components)
 
+## Environment Features
+- **UmbElementMixin**: Already implemented in wrapper.
+- **Context API Ready**: \`super.connectedCallback\` logic included.
+- **Vue Props**: Host element passed as \`mountElem\`.
+- **HTTP Client**: configured in App.vue.
+
 ## Dev
 \`\`\`bash
 npm install
-npm run dev        # dev server locale su index.html
-npm run dev:watch  # build watch in App_Plugins
+npm run dev        # dev server locale
+npm run dev:watch  # build watch in App_Plugins (Recommended for Umbraco dev)
 npm run build      # build produzione
 \`\`\`
-
-## Build output
-- JS: \`${elementPath}\` (entry: \`${elementFile}\`)
-- Vue è **incluso** nel bundle.
-- process.env viene sostituito a build-time (niente errori nel browser).
-
-## Umbraco
-- Manifest creato in \`App_Plugins/${pluginName}/umbraco-package.json\`
-- \`element\` punta al file ESM generato
-${chosen.extType === 'propertyEditorUi' ? `- \`meta.propertyEditorSchemaAlias = "${schemaAlias}"\`` : ''}
 `;
     fs.writeFileSync(path.join(projectRoot, 'README.md'), readme);
 
     console.log('Project scaffold creato:', projectRoot);
 
-    const doInstall = (await ask('\nVuoi eseguire "npm install" ora? (s/N): '))
+    const doInstall = (await ask('\n Vuoi eseguire "npm install" ora? (s/N): '))
       .trim().toLowerCase();
     if (doInstall === 's' || doInstall === 'si' || doInstall === 'y') {
       console.log('\nEseguo npm install...');
@@ -411,18 +492,12 @@ ${chosen.extType === 'propertyEditorUi' ? `- \`meta.propertyEditorSchemaAlias = 
     }
 
     console.log('\n╔═══════════════════════════════════════════════════════╗');
-    console.log('║        Plugin creato con successo!                      ║');
+    console.log('║    Plugin "Environment Ready" Creato!                ║');
     console.log('╚═══════════════════════════════════════════════════════╝\n');
     console.log(`cd ${pluginName}`);
     if (!(doInstall === 's' || doInstall === 'si' || doInstall === 'y')) console.log('npm install');
-    console.log('npm run dev         → Dev server (index.html, sviluppo UI)');
-    console.log('npm run dev:watch   → Build continua in App_Plugins');
-    console.log('npm run build       → Build produzione\n');
-    console.log('Output build:', outDir);
-    console.log('Tipo:', chosen.display);
-    console.log('Alias:', chosen.alias);
-    if (chosen.extType === 'propertyEditorUi') console.log('propertyEditorSchemaAlias:', schemaAlias);
-    console.log('\nSe non vedi subito l’estensione, riavvia l’app o svuota cache app.');
+    console.log('npm run dev:watch   → Per sviluppare dentro Umbraco (Consigliato)');
+    
   } catch (err) {
     console.error('\nErrore:', err?.message || err);
     process.exit(1);
