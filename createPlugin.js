@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 
 /**
  * Create Umbraco 14+ / 17 Plugin (Vue 3 + Vite) — Web Components Ready
@@ -42,12 +41,12 @@ function pascalFromSlug(slug) {
 (async () => {
   try {
     console.log("╔═══════════════════════════════════════════════════════╗");
-    console.log("║  Create Umbraco 14+/17 Plugin (Vue + Vite) — FIX     ║");
+    console.log("║  Create Umbraco 14+/17 Plugin (Vue + Vite)            ║");
     console.log("╚═══════════════════════════════════════════════════════╝\n");
 
     // ========== INPUT ==========
-    const pluginName = (await ask('📦 Nome plugin: ')).trim();
-    const appPluginsPathInput = (await ask('📁 Percorso assoluto di App_Plugins (senza trailing slash): ')).trim();
+    const pluginName = (await ask('Nome plugin: ')).trim();
+    const appPluginsPathInput = (await ask('Percorso assoluto di App_Plugins (senza trailing slash): ')).trim();
 
     console.log(`
 📋 Scegli il tipo di estensione:
@@ -57,8 +56,8 @@ function pascalFromSlug(slug) {
   4) Section`);
     const type = (await ask('> ')).trim();
 
-    if (!pluginName) { console.error('❌ Nome plugin non valido. Abort.'); process.exit(1); }
-    if (!appPluginsPathInput) { console.error('❌ Percorso App_Plugins non valido. Abort.'); process.exit(1); }
+    if (!pluginName) { console.error('Nome plugin non valido. Abort.'); process.exit(1); }
+    if (!appPluginsPathInput) { console.error('Percorso App_Plugins non valido. Abort.'); process.exit(1); }
 
     const kebab = toKebab(pluginName);
     const classSafe = toClassSafe(pluginName);
@@ -70,12 +69,11 @@ function pascalFromSlug(slug) {
       "4": { extType: "section", alias: `${pluginName}.section`, display: "Section", fileSuffix: "section" }
     };
     const chosen = typeMap[type];
-    if (!chosen) { console.error('❌ Tipo non valido. Abort.'); process.exit(1); }
+    if (!chosen) { console.error('Tipo non valido. Abort.'); process.exit(1); }
 
-    // Per Property Editor chiediamo lo schema server-side
     let schemaAlias = "Umbraco.Plain.String";
     if (chosen.extType === "propertyEditorUi") {
-      const ans = (await ask('🔗 propertyEditorSchemaAlias (default Umbraco.Plain.String): ')).trim();
+      const ans = (await ask('propertyEditorSchemaAlias (default Umbraco.Plain.String): ')).trim();
       if (ans) schemaAlias = ans;
     }
 
@@ -178,7 +176,7 @@ export default defineConfig({
 `;
     fs.writeFileSync(path.join(projectRoot, 'index.html'), indexHtml);
 
-    // ========== src/main.ts (solo per dev locale) ==========
+    // ========== src/main.ts ==========
     const mainTs = `import { createApp } from 'vue';
 import App from './App.vue';
 import './styles.css';
@@ -187,7 +185,7 @@ createApp(App).mount('#app');
 `;
     fs.writeFileSync(path.join(projectRoot, 'src', 'main.ts'), mainTs);
 
-    // ========== src/App.vue (demo) ==========
+    // ========== src/App.vue ==========
     const appVue = `<template>
   <div class="plugin-container">
     <div class="plugin-header">
@@ -195,7 +193,7 @@ createApp(App).mount('#app');
       <span class="plugin-badge">{{ type }}</span>
     </div>
     <div class="plugin-content">
-      <p class="status">✅ Vue + Web Component pronto!</p>
+      <p class="status"> Vue + Web Component pronto!</p>
       <div class="counter-demo">
         <h3>Demo Counter:</h3>
         <button @click="count++">Count: {{ count }}</button>
@@ -308,7 +306,7 @@ if (!customElements.get('${customElementTag}')) {
         meta: {
           label: chosen.display,
           icon: "icon-wand",
-          entityTypes: ["document"] // adatta se necessario
+          entityTypes: ["document"] 
         }
       });
     }
@@ -354,7 +352,6 @@ if (!customElements.get('${customElementTag}')) {
         module: "ESNext",
         moduleResolution: "Node",
         allowSyntheticDefaultImports: true,
-        types: ["node"] // <- risolve "Cannot find module 'path'" nel vite.config.ts
       },
       include: ["vite.config.ts"]
     };
@@ -397,37 +394,37 @@ ${chosen.extType === 'propertyEditorUi' ? `- \`meta.propertyEditorSchemaAlias = 
 `;
     fs.writeFileSync(path.join(projectRoot, 'README.md'), readme);
 
-    console.log('✅ Project scaffold creato:', projectRoot);
+    console.log('Project scaffold creato:', projectRoot);
 
-    const doInstall = (await ask('\n📦 Vuoi eseguire "npm install" ora? (s/N): '))
+    const doInstall = (await ask('\nVuoi eseguire "npm install" ora? (s/N): '))
       .trim().toLowerCase();
     if (doInstall === 's' || doInstall === 'si' || doInstall === 'y') {
-      console.log('\n📦 Eseguo npm install...');
+      console.log('\nEseguo npm install...');
       try {
         execSync('npm install', { cwd: projectRoot, stdio: 'inherit' });
-        console.log('✅ npm install completato.');
+        console.log('npm install completato.');
       } catch {
-        console.error('⚠️  Errore durante npm install. Eseguilo manualmente.');
+        console.error('Errore durante npm install. Eseguilo manualmente.');
       }
     } else {
-      console.log('\n⏭️  Installazione saltata.');
+      console.log('\n⏭Installazione saltata.');
     }
 
     console.log('\n╔═══════════════════════════════════════════════════════╗');
-    console.log('║  🎉 Plugin creato con successo!                      ║');
+    console.log('║        Plugin creato con successo!                      ║');
     console.log('╚═══════════════════════════════════════════════════════╝\n');
     console.log(`cd ${pluginName}`);
     if (!(doInstall === 's' || doInstall === 'si' || doInstall === 'y')) console.log('npm install');
     console.log('npm run dev         → Dev server (index.html, sviluppo UI)');
     console.log('npm run dev:watch   → Build continua in App_Plugins');
     console.log('npm run build       → Build produzione\n');
-    console.log('📂 Output build:', outDir);
-    console.log('📝 Tipo:', chosen.display);
-    console.log('🔖 Alias:', chosen.alias);
-    if (chosen.extType === 'propertyEditorUi') console.log('🔗 propertyEditorSchemaAlias:', schemaAlias);
-    console.log('\n💡 Se non vedi subito l’estensione, riavvia l’app o svuota cache app.');
+    console.log('Output build:', outDir);
+    console.log('Tipo:', chosen.display);
+    console.log('Alias:', chosen.alias);
+    if (chosen.extType === 'propertyEditorUi') console.log('propertyEditorSchemaAlias:', schemaAlias);
+    console.log('\nSe non vedi subito l’estensione, riavvia l’app o svuota cache app.');
   } catch (err) {
-    console.error('\n❌ Errore:', err?.message || err);
+    console.error('\nErrore:', err?.message || err);
     process.exit(1);
   }
 })();
