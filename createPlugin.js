@@ -225,7 +225,6 @@ function initAuth() {
   host.value.consumeContext(UMB_AUTH_CONTEXT, (authContext) => {
     const t = authContext?.getLatestToken();
     if (t) {
-      token.value = t;
       console.log("[${pluginName}] Authenticated!");
       // Qui puoi chiamare le tue API: loadData(t);
     }
@@ -296,13 +295,15 @@ button:disabled {
 `;
     fs.writeFileSync(path.join(projectRoot, 'src', 'App.vue'), appVue);
 
+// ========== Web Component Wrapper (.element.ts) ==========
+const elementClassName = `${classSafe}${pascalFromSlug(chosen.fileSuffix)}Element`;
+const appId = `${elementClassName}-app`;
 
-    // ========== Web Component Wrapper (.element.ts) ==========
-    // IL CUORE DELLA FIX: UmbElementMixin + super.connectedCallback
-    const elementClassName = `${classSafe}${pascalFromSlug(chosen.fileSuffix)}Element`;
-    const elementTs = `import { createApp } from 'vue';
+const elementTs = `import { createApp } from 'vue';
 import { UmbElementMixin } from '@umbraco-cms/backoffice/element-api';
 import App from './App.vue';
+
+const appId = '${appId}';
 
 // Template per Shadow DOM
 const template = document.createElement('template');
@@ -310,11 +311,11 @@ template.innerHTML = \`
   <style>
     :host { display: block; }
   </style>
-  <div id="vue-root"></div>
+  <div id="${appId}"></div>
 \`;
 
-export default class ${elementClassName} extends UmbElementMixin(HTMLElement) {
-  #app;
+class ${elementClassName} extends UmbElementMixin(HTMLElement) {
+  app: any;
 
   constructor() {
     super();
@@ -325,29 +326,27 @@ export default class ${elementClassName} extends UmbElementMixin(HTMLElement) {
   connectedCallback() {
     super.connectedCallback();
 
-    const mountElem = this.shadowRoot?.querySelector('#vue-root');
-    
-    if (mountElem && !this.#app) {
-      // Passiamo 'this' (il Web Component Host) come prop a Vue
-      // così App.vue può accedere a 'this.consumeContext'
-      this.#app = createApp(App, { mountElem: this });
-      this.#app.mount(mountElem);
+    const mountElem = this.shadowRoot?.querySelector('#${appId}');
+    this.app = createApp(App, { mountElem});
+    if (mountElem) {
+      this.app.mount(mountElem);
     }
+    
   }
 
   disconnectedCallback() {
-    if (this.#app) {
-      this.#app.unmount();
-      this.#app = null;
-    }
+    this.app?.unmount();
     super.disconnectedCallback();
   }
 }
 
-const tagName = '${customElementTag}';
-if (!customElements.get(tagName)) {
-  customElements.define(tagName, ${elementClassName});
-}
+
+  customElements.define(
+  '${customElementTag}',
+  ${elementClassName}
+);  
+
+export default ${elementClassName};
 `;
     fs.writeFileSync(path.join(projectRoot, elementFile), elementTs);
 
@@ -423,7 +422,7 @@ if (!customElements.get(tagName)) {
         target: "ESNext",
         useDefineForClassFields: true,
         module: "ESNext",
-        moduleResolution: "Node",
+        moduleResolution: "bundler",
         strict: true,
         jsx: "preserve",
         resolveJsonModule: true,
