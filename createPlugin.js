@@ -77,13 +77,23 @@ function pascalFromSlug(slug) {
 
     // ========== PERCORSI ==========
     const projectRoot = path.resolve(process.cwd(), pluginName);
+    const fileIgnore = path.resolve(process.cwd(), '.gitignore');
     const targetAppPlugins = path.resolve(appPluginsPathInput);
     const outDir = path.join(targetAppPlugins, pluginName, 'dist');
     const elementFile = `src/${kebab}-${chosen.fileSuffix}.element.ts`; // entry build
     const customElementTag = `${kebab}-${chosen.fileSuffix}`;
 
     // ========== CARTELLE ==========
-    console.log('\n🔨 Creazione struttura cartelle...');
+    console.log('\nCreazione struttura cartelle...');
+    const gitignoreContent = fs.existsSync(fileIgnore) 
+      ? fs.readFileSync(fileIgnore, 'utf8') 
+      : '';
+    
+    if (!gitignoreContent.includes(pluginName)) {
+      fs.appendFileSync(fileIgnore, `\n# Plugin ${pluginName}\n${pluginName}/\n`);
+      console.log(` Aggiunto ${pluginName}/ a .gitignore`);
+    }
+    
     ensureDir(projectRoot);
     ensureDir(path.join(targetAppPlugins, pluginName));
     ensureDir(path.join(projectRoot, 'src'));
@@ -108,7 +118,7 @@ function pascalFromSlug(slug) {
         vite: "^5.0.0",
         "@vitejs/plugin-vue": "^5.0.0",
         "@types/node": "^20.0.0",
-        "@umbraco-cms/backoffice": "^17.0.0-rc1"
+        "@umbraco-cms/backoffice": "^17.0.0"
       }
     };
     fs.writeFileSync(path.join(projectRoot, 'package.json'), JSON.stringify(pkg, null, 2));
@@ -451,8 +461,7 @@ dist/
 Thumbs.db
 *.log
 .env
-.env.local
-`;
+.env.local`;
     fs.writeFileSync(path.join(projectRoot, '.gitignore'), gitignore);
 
     const readme = `# ${pluginName}
