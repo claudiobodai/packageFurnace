@@ -129,7 +129,13 @@ import vue from '@vitejs/plugin-vue';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag) => tag.startsWith('uui-') || tag.startsWith('umb-')
+      }
+    }
+  })],
   define: {
     // sostituzioni a compile-time per evitare ReferenceError nel browser
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
@@ -156,7 +162,10 @@ export default defineConfig({
     },
     rollupOptions: {
       // Vue nel bundle
-      external: [],
+      external: [
+        /^@umbraco-cms\/backoffice(\/.*)?$/,
+        /^@umbraco-ui\/uui(\/.*)?$/,
+      ],
       output: {
         assetFileNames: '${pluginName}.[ext]'
       }
@@ -222,8 +231,8 @@ function initAuth() {
   if (!host.value) return;
   
   // Utilizzo corretto di consumeContext con callback
-  host.value.consumeContext(UMB_AUTH_CONTEXT, (authContext) => {
-    const t = authContext?.getLatestToken();
+  host.value.consumeContext(UMB_AUTH_CONTEXT, async (authContext) => {
+    const t = await authContext?.getLatestToken();
     if (t) {
       console.log("[${pluginName}] Authenticated!");
       // Qui puoi chiamare le tue API: loadData(t);
@@ -303,16 +312,16 @@ const elementTs = `import { createApp } from 'vue';
 import { UmbElementMixin } from '@umbraco-cms/backoffice/element-api';
 import App from './App.vue';
 
-const appId = '${appId}';
+const appId = '\${appId}';
 
 // Template per Shadow DOM
 const template = document.createElement('template');
-template.innerHTML = \`
+template.innerHTML = \\\`
   <style>
     :host { display: block; }
   </style>
-  <div id="${appId}"></div>
-\`;
+  <div id="\${appId}"></div>
+\\\`;
 
 class ${elementClassName} extends UmbElementMixin(HTMLElement) {
   app: any;
@@ -326,7 +335,7 @@ class ${elementClassName} extends UmbElementMixin(HTMLElement) {
   connectedCallback() {
     super.connectedCallback();
 
-    const mountElem = this.shadowRoot?.querySelector('#${appId}');
+    const mountElem = this.shadowRoot?.querySelector(\`#\${appId}\`);
     this.app = createApp(App, { mountElem});
     if (mountElem) {
       this.app.mount(mountElem);
